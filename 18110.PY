@@ -1,19 +1,17 @@
 import sys
 
-input=sys.stdin.readline().strip()
-
 def my_round(val):
     if val-int(val)>=0.5:
         return int(val)+1
     else:
         return int(val)
 
-n=int(input)
+n=int(sys.stdin.readline().strip())
 
 if n:
     level=[]
-    for i in range(n):
-        level.append(int(input))
+    for _ in range(n):
+        level.append(int(sys.stdin.readline().strip()))
 
     nn=my_round(n*0.15)
     level.sort()
