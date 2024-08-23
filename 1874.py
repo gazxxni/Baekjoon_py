@@ -23,7 +23,7 @@ for i in range(n):
         break
 
 if tmp==False:
-    print("No")
+    print("NO")
 else:
     for i in op:
         print(i)
