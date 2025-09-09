@@ -8,13 +8,13 @@ jobs:
   move:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write  # allow committing with GITHUB_TOKEN
 
     steps:
       - name: Checkout (with previous commit)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # 직전 커밋까지 가져와서 git diff 가능하게
+          fetch-depth: 2  # get HEAD and its parent so git diff works reliably
 
       - name: Compute changed files
         id: changed
@@ -25,12 +25,11 @@ jobs:
           BEFORE="${{ github.event.before }}"
           ZERO40="0000000000000000000000000000000000000000"
 
-          # 첫 실행/특수 상황 대비: 이전 커밋이 없거나 before가 비어 있으면 HEAD^ 기준으로
+          # Determine diff range robustly (first run / squash cases included)
           if [ -z "$BEFORE" ] || [ "$BEFORE" = "$ZERO40" ]; then
             if git rev-parse HEAD^ >/dev/null 2>&1; then
               DIFF_RANGE="HEAD^ HEAD"
             else
-              # 리포 첫 커밋이면 변경 파일은 트리에 존재하는 전체 파일
               DIFF_RANGE=""
             fi
           else
@@ -38,15 +37,16 @@ jobs:
           fi
 
           if [ -n "$DIFF_RANGE" ]; then
+            # Only Added/Modified paths; handle renames and merges
             CHANGED=$(git diff --name-status -m -r $DIFF_RANGE | awk '$1=="A"||$1=="M"{print $2}')
           else
-            # 첫 커밋 케이스: 전체 파일 나열
+            # First commit fallback: include all tracked files
             CHANGED=$(git ls-files)
           fi
 
-          echo "CHANGED<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGED" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "CHANGED<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Move into auto_upload/
         if: ${{ steps.changed.outputs.CHANGED != '' }}
@@ -54,17 +54,25 @@ jobs:
         run: |
           set -e
           moved=false
+
           while IFS= read -r f; do
             [ -z "$f" ] && continue
-            # 이미 auto_upload/ 아래면 건너뜀
+
+            # 🔒 Safety filters:
+            # - already under auto_upload -> skip
+            # - workflow/config dirs -> skip (never move workflows themselves)
             case "$f" in
-              auto_upload/*) continue ;;
+              auto_upload/*|.github/*|.git/*)
+                continue
+                ;;
             esac
-            # 디렉토리면 건너뜀 (원하면 폴더도 이동 로직 추가 가능)
+
+            # Skip directories (only move files)
             if [ -d "$f" ]; then
               continue
             fi
-            # 동일 경로 보존하며 prefix 추가
+
+            # Preserve subpath under auto_upload/
             mkdir -p "auto_upload/$(dirname "$f")"
             git mv -f -- "$f" "auto_upload/$f" || true
             moved=true
