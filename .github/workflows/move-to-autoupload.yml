@@ -11,82 +11,50 @@ jobs:
       contents: write  # allow committing with GITHUB_TOKEN
 
     steps:
-      - name: Checkout (with previous commit)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # get HEAD and its parent so git diff works reliably
+          fetch-depth: 0
 
-      - name: Compute changed files
-        id: changed
+      - name: Move 백준/* into auto_upload/
         shell: bash
         run: |
           set -e
 
-          BEFORE="${{ github.event.before }}"
-          ZERO40="0000000000000000000000000000000000000000"
-
-          # Determine diff range robustly (first run / squash cases included)
-          if [ -z "$BEFORE" ] || [ "$BEFORE" = "$ZERO40" ]; then
-            if git rev-parse HEAD^ >/dev/null 2>&1; then
-              DIFF_RANGE="HEAD^ HEAD"
-            else
-              DIFF_RANGE=""
-            fi
-          else
-            DIFF_RANGE="${BEFORE} ${{ github.sha }}"
-          fi
-
-          if [ -n "$DIFF_RANGE" ]; then
-            # Only Added/Modified paths; handle renames and merges
-            CHANGED=$(git diff --name-status -m -r $DIFF_RANGE | awk '$1=="A"||$1=="M"{print $2}')
-          else
-            # First commit fallback: include all tracked files
-            CHANGED=$(git ls-files)
-          fi
-
-          echo "CHANGED<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CHANGED" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Move into auto_upload/
-        if: ${{ steps.changed.outputs.CHANGED != '' }}
-        shell: bash
-        run: |
-          set -e
           moved=false
 
-          while IFS= read -r f; do
-            [ -z "$f" ] && continue
-
-            # 🔒 Safety filters:
-            # - already under auto_upload -> skip
-            # - workflow/config dirs -> skip (never move workflows themselves)
-            case "$f" in
-              auto_upload/*|.github/*|.git/*)
-                continue
-                ;;
+          # 이미 auto_upload/ 또는 .github/ 아래는 스킵
+          # "백준/"으로 시작하는 모든 경로(파일/폴더)를 대상으로 이동
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            case "$path" in
+              auto_upload/*|.github/*|.git/*) continue ;;
             esac
 
-            # Skip directories (only move files)
-            if [ -d "$f" ]; then
-              continue
-            fi
-
-            # Preserve subpath under auto_upload/
-            mkdir -p "auto_upload/$(dirname "$f")"
-            git mv -f -- "$f" "auto_upload/$f" || true
+            # 디렉터리/파일 모두 처리
+            dest="auto_upload/$path"
+            mkdir -p "$(dirname "$dest")"
+            git mv -f -- "$path" "$dest" || true
             moved=true
-          done <<< "${{ steps.changed.outputs.CHANGED }}"
+          done < <(git ls-files | grep -E '^백준/')
+
+          # (선택) 루트에 떠 있는 단일 소스 파일도 같이 정리하고 싶으면 아래 주석 해제
+          # while IFS= read -r path; do
+          #   [ -z "$path" ] && continue
+          #   case "$path" in
+          #     auto_upload/*|.github/*|.git/*) continue ;;
+          #   esac
+          #   dest="auto_upload/$path"
+          #   mkdir -p "$(dirname "$dest")"
+          #   git mv -f -- "$path" "$dest" || true
+          #   moved=true
+          # done < <(git ls-files | grep -E '^[^/]+\.(py|cpp|java|md)$')
 
           if [ "$moved" = true ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore: move files under auto_upload/"
+            git commit -m "chore: auto-move 백준/* under auto_upload/"
             git push
           else
             echo "Nothing to move."
           fi
-
-      - name: Nothing changed
-        if: ${{ steps.changed.outputs.CHANGED == '' }}
-        run: echo "No changed files to move."
