@@ -9,23 +9,67 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Move newly changed files into auto_upload/
+    steps:
+      - name: Checkout (with previous commit)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # 직전 커밋까지 가져와서 git diff 가능하게
+
+      - name: Compute changed files
+        id: changed
         shell: bash
         run: |
           set -e
-          CHANGED=$(git diff --name-status ${{ github.event.before }} ${{ github.sha }} | awk '$1=="A"||$1=="M"{print $2}')
+
+          BEFORE="${{ github.event.before }}"
+          ZERO40="0000000000000000000000000000000000000000"
+
+          # 첫 실행/특수 상황 대비: 이전 커밋이 없거나 before가 비어 있으면 HEAD^ 기준으로
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "$ZERO40" ]; then
+            if git rev-parse HEAD^ >/dev/null 2>&1; then
+              DIFF_RANGE="HEAD^ HEAD"
+            else
+              # 리포 첫 커밋이면 변경 파일은 트리에 존재하는 전체 파일
+              DIFF_RANGE=""
+            fi
+          else
+            DIFF_RANGE="${BEFORE} ${{ github.sha }}"
+          fi
+
+          if [ -n "$DIFF_RANGE" ]; then
+            CHANGED=$(git diff --name-status -m -r $DIFF_RANGE | awk '$1=="A"||$1=="M"{print $2}')
+          else
+            # 첫 커밋 케이스: 전체 파일 나열
+            CHANGED=$(git ls-files)
+          fi
+
+          echo "CHANGED<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Move into auto_upload/
+        if: ${{ steps.changed.outputs.CHANGED != '' }}
+        shell: bash
+        run: |
+          set -e
           moved=false
-          for f in $CHANGED; do
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
             # 이미 auto_upload/ 아래면 건너뜀
-            [[ "$f" == auto_upload/* ]] && continue
-            # 디렉토리 구조 보존하여 prefix 추가
+            case "$f" in
+              auto_upload/*) continue ;;
+            esac
+            # 디렉토리면 건너뜀 (원하면 폴더도 이동 로직 추가 가능)
+            if [ -d "$f" ]; then
+              continue
+            fi
+            # 동일 경로 보존하며 prefix 추가
             mkdir -p "auto_upload/$(dirname "$f")"
-            git mv -f "$f" "auto_upload/$f" 2>/dev/null || true
+            git mv -f -- "$f" "auto_upload/$f" || true
             moved=true
-          done
+          done <<< "${{ steps.changed.outputs.CHANGED }}"
+
           if [ "$moved" = true ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -34,3 +78,7 @@ jobs:
           else
             echo "Nothing to move."
           fi
+
+      - name: Nothing changed
+        if: ${{ steps.changed.outputs.CHANGED == '' }}
+        run: echo "No changed files to move."
