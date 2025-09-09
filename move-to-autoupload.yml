@@ -1,0 +1,36 @@
+name: Move files under auto_upload
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  move:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Move newly changed files into auto_upload/
+        shell: bash
+        run: |
+          set -e
+          CHANGED=$(git diff --name-status ${{ github.event.before }} ${{ github.sha }} | awk '$1=="A"||$1=="M"{print $2}')
+          moved=false
+          for f in $CHANGED; do
+            # 이미 auto_upload/ 아래면 건너뜀
+            [[ "$f" == auto_upload/* ]] && continue
+            # 디렉토리 구조 보존하여 prefix 추가
+            mkdir -p "auto_upload/$(dirname "$f")"
+            git mv -f "$f" "auto_upload/$f" 2>/dev/null || true
+            moved=true
+          done
+          if [ "$moved" = true ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: move files under auto_upload/"
+            git push
+          else
+            echo "Nothing to move."
+          fi
