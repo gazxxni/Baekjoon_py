@@ -3,6 +3,8 @@ name: Move files under auto_upload
 on:
   push:
     branches: [ "main" ]
+  # 필요하면 수동 실행도 허용
+  # workflow_dispatch:
 
 jobs:
   move:
@@ -16,45 +18,59 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Move 백준/* into auto_upload/
+      - name: Move 백준/* into auto_upload/ (robust, unicode-safe)
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
+
+          # 사람이 읽기 쉬운 이름(유니코드 그대로)로 보이게
+          git config core.quotepath false
+
+          # git ls-files 을 널 구분(-z)로 받아 안전하게 순회
+          mapfile -d '' -t TRACKED < <(git ls-files -z)
 
           moved=false
+          declare -a TO_MOVE=()
 
-          # 이미 auto_upload/ 또는 .github/ 아래는 스킵
-          # "백준/"으로 시작하는 모든 경로(파일/폴더)를 대상으로 이동
-          while IFS= read -r path; do
-            [ -z "$path" ] && continue
-            case "$path" in
+          # 1) 이동 대상 수집: "백준/" 으로 시작하는 모든 경로
+          for p in "${TRACKED[@]}"; do
+            # 이미 auto_upload/ .github/ .git/ 아래면 스킵
+            case "$p" in
               auto_upload/*|.github/*|.git/*) continue ;;
             esac
+            case "$p" in
+              백준/*) TO_MOVE+=("$p") ;;
+            esac
+          done
 
-            # 디렉터리/파일 모두 처리
-            dest="auto_upload/$path"
+          # (원하면 여러 접두어도 지원: 아래 주석을 풀고 위 case를 지워도 됨)
+          # for p in "${TRACKED[@]}"; do
+          #   case "$p" in auto_upload/*|.github/*|.git/*) continue ;; esac
+          #   [[ "$p" =~ ^(백준|BOJ|boj)/ ]] && TO_MOVE+=("$p")
+          # done
+
+          if [ ${#TO_MOVE[@]} -eq 0 ]; then
+            echo "Nothing to move."
+            exit 0
+          fi
+
+          echo "Will move ${#TO_MOVE[@]} path(s) under auto_upload/ ..."
+
+          # 2) 실제 이동 (파일/폴더 모두 동일하게 처리)
+          for f in "${TO_MOVE[@]}"; do
+            dest="auto_upload/$f"
             mkdir -p "$(dirname "$dest")"
-            git mv -f -- "$path" "$dest" || true
+            # -- 와 따옴표로 공백/한글/유니코드 안전
+            git mv -f -- "$f" "$dest" || true
             moved=true
-          done < <(git ls-files | grep -E '^백준/')
+          done
 
-          # (선택) 루트에 떠 있는 단일 소스 파일도 같이 정리하고 싶으면 아래 주석 해제
-          # while IFS= read -r path; do
-          #   [ -z "$path" ] && continue
-          #   case "$path" in
-          #     auto_upload/*|.github/*|.git/*) continue ;;
-          #   esac
-          #   dest="auto_upload/$path"
-          #   mkdir -p "$(dirname "$dest")"
-          #   git mv -f -- "$path" "$dest" || true
-          #   moved=true
-          # done < <(git ls-files | grep -E '^[^/]+\.(py|cpp|java|md)$')
-
+          # 3) 커밋/푸시
           if [ "$moved" = true ]; then
-            git config user.name "github-actions[bot]"
+            git config user.name  "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "chore: auto-move 백준/* under auto_upload/"
             git push
           else
-            echo "Nothing to move."
+            echo "Nothing moved."
           fi
