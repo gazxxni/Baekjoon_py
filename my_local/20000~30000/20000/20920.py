@@ -7,6 +7,18 @@ n, m = map(int, input().split())
 dic = defaultdict(int)
 for _ in range(n):
     a = input().rstrip()
-    dic[a] += 1
+    if len(a) >= m:
+        dic[a] += 1
     
-a = sorted(dic.items(), key=lambda x:x[1], reverse=True)
+dic2 = defaultdict(list)
+for k, v in dic.items():
+    dic2[v].append(k)
+    
+for k, v in dic2.items():
+    v.sort(key=lambda x: (-len(x), x))
+    
+a = sorted(dic2.items(), key=lambda x:x[0], reverse=True)
+
+for i, j in a:
+    for k in j:
+        print(k)
