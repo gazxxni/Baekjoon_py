@@ -1,0 +1,37 @@
+```yaml
+name: Update Blog Post from BaekjoonHub
+
+on:
+  push:
+    branches:
+      - main  # 백준허브가 푸시하는 브랜치 이름 (보통 main 또는 master)
+    paths-ignore:
+      - '_posts/**' # 무한 루프 방지 (포스트 생성된 것 때문에 다시 도는 것 방지)
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout content
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Run Converter Script
+      run: |
+        python convert.py
+
+    - name: Commit and Push changes
+      run: |
+        git config --global user.name 'GitHub Action'
+        git config --global user.email 'action@github.com'
+        git add _posts/
+        git commit -m "Auto-generated blog posts from BaekjoonHub" || echo "No changes to commit"
+        git push
