@@ -2,35 +2,34 @@ import os
 import datetime
 import re
 
-# 백준허브가 코드를 저장하는 디렉토리 구조에 맞춰 설정 (보통 '백준' 폴더 등)
-# 깃허브 레포지토리의 구조를 봐야 정확하지만, 보통 최상위나 특정 폴더를 순회하도록 설정합니다.
+# 설정: 소스 경로(현재 위치)와 출력 경로(저장될 폴더)
 SOURCE_DIR = "." 
-POSTS_DIR = "_posts"  # 깃허브 블로그의 포스팅 저장 폴더 (Jekyll 기준)
+OUTPUT_DIR = "blog_posts"
 
 def get_problem_info(filename):
-    # 파일명에서 문제 번호 추출 (예: 1234.py -> 1234)
+    # 파일명에서 숫자(문제 번호)만 추출
     match = re.search(r'(\d+)', filename)
     if match:
         return match.group(1)
     return None
 
 def create_markdown(file_path, problem_id):
-    # 오늘 날짜
+    # 오늘 날짜 (YYYY-MM-DD)
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     
     # 소스 코드 읽기
     with open(file_path, 'r', encoding='utf-8') as f:
         code_content = f.read()
 
-    # 파일 확장자에 따른 언어 설정
+    # 확장자 확인
     ext = os.path.splitext(file_path)[1]
     language = "python" if ext == ".py" else "text"
 
-    # 블로그 포스트 제목 생성
+    # 포스트 제목 및 파일명 설정
     post_title = f"[백준] {problem_id}번 풀이 (파이썬)"
     filename = f"{today}-baekjoon-{problem_id}.md"
     
-    # 분석한 티스토리 스타일 템플릿 적용
+    # 블로그 포스트 내용 (분석된 티스토리 스타일)
     markdown_content = f"""---
 layout: post
 title:  "{post_title}"
@@ -73,28 +72,39 @@ tags: [IT, 코드, 코딩, 파이썬, Algorithm, 풀이, 백준, 코테, baekjoo
 
 ```{language}
 {code_content}
+```
 
-#IT #코드 #코딩 #파이썬 #Algorithm #풀이 #백준 #코테 #baekjoon #{problem_id} """
+#IT #코드 #코딩 #파이썬 #Algorithm #풀이 #백준 #코테 #baekjoon #{problem_id}
 
-# _posts 폴더가 없으면 생성
-if not os.path.exists(POSTS_DIR):
-    os.makedirs(POSTS_DIR)
 
-# 파일 쓰기
-output_path = os.path.join(POSTS_DIR, filename)
-# 이미 생성된 파일이 없을 경우에만 생성 (중복 방지)
-if not os.path.exists(output_path):
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(markdown_content)
-    print(f"Created post: {filename}")
-else:
-    print(f"Skipped (already exists): {filename}")
+    # 출력 폴더가 없으면 생성
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
 
-def main(): # 모든 파일 순회하며 .py 파일 찾기 for root, dirs, files in os.walk(SOURCE_DIR): # .git 폴더나 _posts 폴더 등은 제외 if ".git" in root or "_posts" in root: continue
+    # 파일 쓰기
+    output_path = os.path.join(OUTPUT_DIR, filename)
+    
+    # 이미 파일이 존재하면 건너뜀 (덮어쓰기 방지)
+    if not os.path.exists(output_path):
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(markdown_content)
+        print(f"Created post: {filename}")
+    else:
+        print(f"Skipped (already exists): {filename}")
 
-    for file in files:
-        if file.endswith(".py"): # 파이썬 파일만 대상
-            problem_id = get_problem_info(file)
-            if problem_id:
-                create_markdown(os.path.join(root, file), problem_id)
-if name == "main": main()
+def main():
+    # 모든 하위 폴더 및 파일 순회
+    for root, dirs, files in os.walk(SOURCE_DIR):
+        # .git 폴더나 출력 폴더는 제외
+        if ".git" in root or OUTPUT_DIR in root:
+            continue
+            
+        for file in files:
+            # .py 파일만 찾아서 변환
+            if file.endswith(".py"):
+                problem_id = get_problem_info(file)
+                if problem_id:
+                    create_markdown(os.path.join(root, file), problem_id)
+
+if __name__ == "__main__":
+    main()
