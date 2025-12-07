@@ -1,16 +1,78 @@
 import os
 import datetime
 import re
+import requests
+from bs4 import BeautifulSoup
 
-# 설정: 소스 경로와 출력 경로
+# 소스 파일과 결과물이 저장될 폴더 설정
 SOURCE_DIR = "."
 OUTPUT_DIR = "blog_posts"
 
 def get_problem_info(filename):
+    # 파일명에서 숫자만 추출하여 문제 번호로 사용
     match = re.search(r'(\d+)', filename)
     if match:
         return match.group(1)
     return None
+
+def scrape_problem_data(problem_id):
+    # 백준 문제 페이지에서 제목, 설명, 입력, 출력, 예제 정보를 가져옴
+    url = f"https://www.acmicpc.net/problem/{problem_id}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        desc_elem = soup.select_one("#problem_description")
+        input_elem = soup.select_one("#problem_input")
+        output_elem = soup.select_one("#problem_output")
+        
+        description = desc_elem.get_text("\n", strip=True) if desc_elem else "문제 설명을 가져올 수 없습니다."
+        input_text = input_elem.get_text("\n", strip=True) if input_elem else "입력 설명을 가져올 수 없습니다."
+        output_text = output_elem.get_text("\n", strip=True) if output_elem else "출력 설명을 가져올 수 없습니다."
+        
+        sample_io = []
+        index = 1
+        while True:
+            sample_input = soup.select_one(f"#sample-input-{index}")
+            sample_output = soup.select_one(f"#sample-output-{index}")
+            
+            if not sample_input or not sample_output:
+                break
+                
+            input_val = sample_input.get_text("\n", strip=True)
+            output_val = sample_output.get_text("\n", strip=True)
+            
+            sample_io.append(f"**예제 입력 {index}**\n```\n{input_val}\n```")
+            sample_io.append(f"**예제 출력 {index}**\n```\n{output_val}\n```")
+            index += 1
+            
+        sample_io_text = "\n\n".join(sample_io) if sample_io else "예제 입출력이 없습니다."
+        
+        return {
+            "description": description,
+            "input": input_text,
+            "output": output_text,
+            "sample": sample_io_text
+        }
+        
+    except Exception as e:
+        print(f"Error scraping problem {problem_id}: {e}")
+        return None
+
+def extract_logic_from_code(code_content):
+    # 코드 최상단에 있는 따옴표 3개 주석을 추출하여 로직 설명으로 사용
+    match = re.match(r'\s*"""(.*?)"""|\s*\'\'\'(.*?)\'\'\'', code_content, re.DOTALL)
+    
+    if match:
+        logic = match.group(1) or match.group(2)
+        return logic.strip()
+    
+    return "코드 상단에 주석(Docstring)을 작성하면 이 곳에 자동으로 내용이 채워집니다."
 
 def create_markdown(file_path, problem_id):
     today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -18,12 +80,25 @@ def create_markdown(file_path, problem_id):
     with open(file_path, 'r', encoding='utf-8') as f:
         code_content = f.read()
 
+    # 문제 정보 크롤링 수행
+    problem_data = scrape_problem_data(problem_id)
+    if not problem_data:
+        problem_data = {
+            "description": "문제 정보를 불러오는데 실패했습니다.",
+            "input": "-",
+            "output": "-",
+            "sample": "-"
+        }
+
+    # 코드 내 로직 주석 추출 수행
+    logic_content = extract_logic_from_code(code_content)
+
     ext = os.path.splitext(file_path)[1]
     language = "python" if ext == ".py" else "text"
     post_title = f"[백준] {problem_id}번 풀이 (파이썬)"
     filename = f"{today}-baekjoon-{problem_id}.md"
 
-    # 블로그 본문 내용을 줄 단위로 리스트에 담아 합칩니다 (오류 방지용)
+    # 블로그 본문 내용을 리스트로 구성하여 안전하게 결합
     lines = [
         "---",
         "layout: post",
@@ -39,29 +114,28 @@ def create_markdown(file_path, problem_id):
         "---",
         "",
         "#### **문제**",
-        "(문제 설명 이미지는 저작권 및 기술적 이슈로 자동 첨부되지 않습니다. 위 링크를 참고하세요.)",
+        problem_data["description"],
         "",
         "---",
         "",
         "#### **입력**",
-        "(입력 설명)",
+        problem_data["input"],
         "",
         "---",
         "",
         "#### **출력**",
-        "(출력 설명)",
+        problem_data["output"],
         "",
         "---",
         "",
         "#### **예제 입출력**",
-        "(예제 입출력)",
+        problem_data["sample"],
         "",
         "---",
         "",
         "#### **문제 풀이 및 코드**",
         "",
-        "- 문제의 핵심 로직을 여기에 작성하세요.",
-        "- (자동 생성된 포스팅입니다. 구체적인 풀이 설명은 수정이 필요합니다.)",
+        logic_content,
         "",
         "**총 시간 복잡도: O(N)** (알고리즘에 맞춰 수정 필요)",
         "",
@@ -72,7 +146,6 @@ def create_markdown(file_path, problem_id):
         f"#IT #코드 #코딩 #파이썬 #Algorithm #풀이 #백준 #코테 #baekjoon #{problem_id}"
     ]
     
-    # 리스트를 하나의 문자열로 합침
     markdown_content = "\n".join(lines)
 
     if not os.path.exists(OUTPUT_DIR):
@@ -80,6 +153,7 @@ def create_markdown(file_path, problem_id):
 
     output_path = os.path.join(OUTPUT_DIR, filename)
     
+    # 덮어쓰기 방지
     if not os.path.exists(output_path):
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(markdown_content)
@@ -89,7 +163,6 @@ def create_markdown(file_path, problem_id):
 
 def main():
     for root, dirs, files in os.walk(SOURCE_DIR):
-        # .git 폴더나 출력 폴더는 제외
         if ".git" in root or OUTPUT_DIR in root:
             continue
             
