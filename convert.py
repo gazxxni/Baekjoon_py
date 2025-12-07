@@ -1,6 +1,7 @@
 import os
 import datetime
 import re
+import time
 import google.generativeai as genai
 
 SOURCE_DIR = "auto_upload"
@@ -69,10 +70,9 @@ def parse_readme(readme_path):
         return None
 
 def generate_solution_with_ai(problem_data, code_content):
-    """Gemini API로 풀이 생성"""
+    """Gemini API로 풀이 생성 (RPM 제한 회피)"""
     api_key = os.environ.get("GEMINI_API_KEY")
     
-    # 디버깅: API 키 존재 여부 확인
     if not api_key:
         print("[ERROR] GEMINI_API_KEY is empty or not set")
         return None
@@ -82,9 +82,9 @@ def generate_solution_with_ai(problem_data, code_content):
     try:
         genai.configure(api_key=api_key)
         
-        # 모델 설정 with safety settings
+        # 모델 변경: gemini-1.5-flash-8b (더 가볍고 빠름)
         model = genai.GenerativeModel(
-            model_name='gemini-2.0-flash',
+            model_name='gemini-1.5-flash-8b',
             generation_config={
                 "temperature": 0.7,
                 "max_output_tokens": 1024,
@@ -122,16 +122,28 @@ def generate_solution_with_ai(problem_data, code_content):
         # 응답 확인
         if response and response.text:
             print("[OK] AI solution generated successfully")
+            
+            # RPM 제한 회피: 4초 대기
+            print("[INFO] Waiting 4 seconds to avoid rate limit...")
+            time.sleep(4)
+            
             return response.text.strip()
         else:
             print(f"[ERROR] Empty response from Gemini")
             print(f"[DEBUG] Response object: {response}")
+            
+            # 실패해도 대기 (다음 요청을 위해)
+            time.sleep(4)
             return None
         
     except Exception as e:
         print(f"[ERROR] Gemini API exception: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
+        
+        # 에러 발생해도 대기 (다음 요청을 위해)
+        print("[INFO] Waiting 4 seconds before retry...")
+        time.sleep(4)
         return None
 
 def create_markdown(py_path, readme_path, problem_id):
@@ -236,6 +248,7 @@ def main():
     
     print(f"[INFO] Scanning {SOURCE_DIR}...")
     print(f"[DEBUG] GEMINI_API_KEY exists: {bool(os.environ.get('GEMINI_API_KEY'))}")
+    print(f"[INFO] Using model: gemini-1.5-flash-8b with 4s delay between requests")
     
     for root, dirs, files in os.walk(SOURCE_DIR):
         if ".git" in root or OUTPUT_DIR in root:
@@ -253,6 +266,7 @@ def main():
                 
                 if problem_id and problem_id not in processed:
                     found_any = True
+                    print(f"\n[INFO] Processing problem {problem_id}...")
                     print(f"[INFO] Found: {py_path}")
                     create_markdown(py_path, readme_path, problem_id)
                     processed.add(problem_id)
@@ -260,10 +274,9 @@ def main():
     if not found_any:
         print("[WARN] No valid problem folders found")
     else:
-        print(f"[DONE] Processed {len(processed)} problems")
+        print(f"\n{'='*50}")
+        print(f"[DONE] Successfully processed {len(processed)} problems")
+        print(f"{'='*50}")
 
 if __name__ == "__main__":
     main()
-
-
-## 디버깅
