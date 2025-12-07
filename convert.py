@@ -82,9 +82,9 @@ def generate_solution_with_ai(problem_data, code_content):
     try:
         genai.configure(api_key=api_key)
         
-        # 모델 변경: gemini-1.5-flash-8b (더 가볍고 빠름)
+        # 모델 변경: gemini-1.5-flash-8b-latest (더 가볍고 빠름)
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash-8b',
+            model_name='gemini-1.5-flash-8b-latest',
             generation_config={
                 "temperature": 0.7,
                 "max_output_tokens": 1024,
@@ -248,7 +248,7 @@ def main():
     
     print(f"[INFO] Scanning {SOURCE_DIR}...")
     print(f"[DEBUG] GEMINI_API_KEY exists: {bool(os.environ.get('GEMINI_API_KEY'))}")
-    print(f"[INFO] Using model: gemini-1.5-flash-8b with 4s delay between requests")
+    print(f"[INFO] Using model: gemini-1.5-flash-8b-latest with 4s delay between requests")
     
     for root, dirs, files in os.walk(SOURCE_DIR):
         if ".git" in root or OUTPUT_DIR in root:
