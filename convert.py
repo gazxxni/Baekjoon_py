@@ -30,38 +30,32 @@ def parse_readme(readme_path):
             "time": ""
         }
         
-        # 제목과 문제번호: # [Bronze V] Hello Judge - 9316
         title_match = re.search(r'#\s*\[.*?\]\s*(.+?)\s*-\s*(\d+)', content)
         if title_match:
             data["title"] = title_match.group(1).strip()
             data["problem_id"] = title_match.group(2).strip()
         
-        # 성능 요약: 메모리: 108384 KB, 시간: 84 ms
         perf_match = re.search(r'메모리:\s*(\d+\s*KB).*?시간:\s*(\d+\s*ms)', content)
         if perf_match:
             data["memory"] = perf_match.group(1)
             data["time"] = perf_match.group(2)
         
-        # 분류
         category_match = re.search(r'### 분류\s*\n(.+?)(?=\n###|\n#|\Z)', content, re.DOTALL)
         if category_match:
             data["category"] = category_match.group(1).strip()
         
-        # 문제 설명 (HTML 태그 제거)
         desc_match = re.search(r'### 문제 설명\s*\n(.+?)(?=\n###|\n#|\Z)', content, re.DOTALL)
         if desc_match:
             desc = desc_match.group(1).strip()
-            desc = re.sub(r'<[^>]+>', '', desc)  # HTML 태그 제거
+            desc = re.sub(r'<[^>]+>', '', desc)
             data["description"] = desc.strip()
         
-        # 입력
         input_match = re.search(r'### 입력\s*\n(.+?)(?=\n###|\n#|\Z)', content, re.DOTALL)
         if input_match:
             inp = input_match.group(1).strip()
             inp = re.sub(r'<[^>]+>', '', inp)
             data["input"] = inp.strip()
         
-        # 출력
         output_match = re.search(r'### 출력\s*\n(.+?)(?=\n###|\n#|\Z)', content, re.DOTALL)
         if output_match:
             out = output_match.group(1).strip()
@@ -77,62 +71,76 @@ def parse_readme(readme_path):
 def generate_solution_with_ai(problem_data, code_content):
     """Gemini API로 풀이 생성"""
     api_key = os.environ.get("GEMINI_API_KEY")
+    
+    # 디버깅: API 키 존재 여부 확인
     if not api_key:
-        print("[ERROR] GEMINI_API_KEY not found in environment")
+        print("[ERROR] GEMINI_API_KEY is empty or not set")
         return None
+    
+    print(f"[DEBUG] API key found (length: {len(api_key)})")
 
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        prompt = f"""당신은 알고리즘 블로그 작성자입니다. 아래 백준 문제와 정답 코드를 분석하여 풀이를 작성해주세요.
+        # 모델 설정 with safety settings
+        model = genai.GenerativeModel(
+            model_name='gemini-1.5-flash',
+            generation_config={
+                "temperature": 0.7,
+                "max_output_tokens": 1024,
+            }
+        )
+        
+        prompt = f"""백준 문제 풀이를 작성해주세요.
 
-## 문제 정보
-- 번호: {problem_data.get('problem_id', '')}
-- 제목: {problem_data.get('title', '')}
-- 분류: {problem_data.get('category', '')}
-- 설명: {problem_data.get('description', '')}
-- 입력: {problem_data.get('input', '')}
-- 출력: {problem_data.get('output', '')}
+문제 번호: {problem_data.get('problem_id', '')}
+제목: {problem_data.get('title', '')}
+분류: {problem_data.get('category', '')}
+설명: {problem_data.get('description', '')}
+입력: {problem_data.get('input', '')}
+출력: {problem_data.get('output', '')}
 
-## 정답 코드
+정답 코드:
 ```python
 {code_content}
 ```
 
-## 작성 요청
-아래 형식 그대로 마크다운을 작성해주세요:
+아래 형식으로 작성해주세요:
 
 ### 풀이 핵심 로직
-(이 문제를 푸는 핵심 아이디어를 2-3문장으로 설명)
+(핵심 아이디어 2-3문장)
 
 ### 동작 과정
-(간단한 예시 입력으로 코드가 어떻게 동작하는지 단계별로 설명)
+(예시 입력으로 단계별 설명)
 
 ### 시간 복잡도
-(빅오 표기법과 간단한 이유)
+(빅오 표기법)"""
 
----
-서론, 인사말, 마무리 없이 위 세 섹션만 작성."""
-
+        print("[DEBUG] Sending request to Gemini API...")
         response = model.generate_content(prompt)
-        result = response.text.strip()
-        print(f"[OK] AI solution generated")
-        return result
+        
+        # 응답 확인
+        if response and response.text:
+            print("[OK] AI solution generated successfully")
+            return response.text.strip()
+        else:
+            print(f"[ERROR] Empty response from Gemini")
+            print(f"[DEBUG] Response object: {response}")
+            return None
         
     except Exception as e:
-        print(f"[ERROR] Gemini API failed: {e}")
+        print(f"[ERROR] Gemini API exception: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def create_markdown(py_path, readme_path, problem_id):
     """마크다운 파일 생성"""
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     
-    # 코드 읽기
     with open(py_path, 'r', encoding='utf-8') as f:
         code_content = f.read()
 
-    # README 파싱
     problem_data = parse_readme(readme_path)
     
     if not problem_data:
@@ -148,7 +156,6 @@ def create_markdown(py_path, readme_path, problem_id):
             "time": ""
         }
 
-    # AI 풀이 생성
     ai_solution = generate_solution_with_ai(problem_data, code_content)
     
     if not ai_solution:
@@ -161,7 +168,6 @@ def create_markdown(py_path, readme_path, problem_id):
 ### 시간 복잡도
 -"""
 
-    # 마크다운 생성
     title = problem_data.get('title', problem_id)
     post_title = f"[백준] {problem_id}번 {title} (Python)"
     filename = f"{today}-baekjoon-{problem_id}.md"
@@ -229,12 +235,12 @@ def main():
     found_any = False
     
     print(f"[INFO] Scanning {SOURCE_DIR}...")
+    print(f"[DEBUG] GEMINI_API_KEY exists: {bool(os.environ.get('GEMINI_API_KEY'))}")
     
     for root, dirs, files in os.walk(SOURCE_DIR):
         if ".git" in root or OUTPUT_DIR in root:
             continue
         
-        # 폴더 내 .py 파일과 README.md 찾기
         py_files = [f for f in files if f.endswith(".py")]
         has_readme = "README.md" in files
         
@@ -248,7 +254,6 @@ def main():
                 if problem_id and problem_id not in processed:
                     found_any = True
                     print(f"[INFO] Found: {py_path}")
-                    print(f"[INFO] README: {readme_path}")
                     create_markdown(py_path, readme_path, problem_id)
                     processed.add(problem_id)
     
