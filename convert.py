@@ -2,7 +2,7 @@ import os
 import datetime
 import re
 import time
-import google.generativeai as genai
+from openai import OpenAI
 
 SOURCE_DIR = "auto_upload"
 OUTPUT_DIR = "blog_posts"
@@ -70,26 +70,17 @@ def parse_readme(readme_path):
         return None
 
 def generate_solution_with_ai(problem_data, code_content):
-    """Gemini API로 풀이 생성 (RPM 제한 회피)"""
-    api_key = os.environ.get("GEMINI_API_KEY")
+    """OpenAI GPT로 풀이 생성 (RPM 제한 회피)"""
+    api_key = os.environ.get("OPENAI_API_KEY")
     
     if not api_key:
-        print("[ERROR] GEMINI_API_KEY is empty or not set")
+        print("[ERROR] OPENAI_API_KEY is empty or not set")
         return None
     
     print(f"[DEBUG] API key found (length: {len(api_key)})")
 
     try:
-        genai.configure(api_key=api_key)
-        
-        # 모델 변경: gemini-1.5-flash-8b-latest (더 가볍고 빠름)
-        model = genai.GenerativeModel(
-            model_name='gemini-2.0-flash',
-            generation_config={
-                "temperature": 0.7,
-                "max_output_tokens": 1024,
-            }
-        )
+        client = OpenAI(api_key=api_key)
         
         prompt = f"""백준 문제 풀이를 작성해주세요.
 
@@ -116,20 +107,31 @@ def generate_solution_with_ai(problem_data, code_content):
 ### 시간 복잡도
 (빅오 표기법)"""
 
-        print("[DEBUG] Sending request to Gemini API...")
-        response = model.generate_content(prompt)
+        print("[DEBUG] Sending request to OpenAI API...")
+        
+        # GPT-4o-mini 사용 (저렴하고 빠름)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "당신은 알고리즘 문제 풀이를 명확하게 설명하는 전문가입니다."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1024
+        )
         
         # 응답 확인
-        if response and response.text:
+        if response and response.choices:
+            solution = response.choices[0].message.content.strip()
             print("[OK] AI solution generated successfully")
             
             # RPM 제한 회피: 4초 대기
             print("[INFO] Waiting 4 seconds to avoid rate limit...")
             time.sleep(4)
             
-            return response.text.strip()
+            return solution
         else:
-            print(f"[ERROR] Empty response from Gemini")
+            print(f"[ERROR] Empty response from OpenAI")
             print(f"[DEBUG] Response object: {response}")
             
             # 실패해도 대기 (다음 요청을 위해)
@@ -137,7 +139,7 @@ def generate_solution_with_ai(problem_data, code_content):
             return None
         
     except Exception as e:
-        print(f"[ERROR] Gemini API exception: {type(e).__name__}: {e}")
+        print(f"[ERROR] OpenAI API exception: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
         
@@ -247,8 +249,8 @@ def main():
     found_any = False
     
     print(f"[INFO] Scanning {SOURCE_DIR}...")
-    print(f"[DEBUG] GEMINI_API_KEY exists: {bool(os.environ.get('GEMINI_API_KEY'))}")
-    print(f"[INFO] Using model: gemini-1.5-flash-8b-latest with 4s delay between requests")
+    print(f"[DEBUG] OPENAI_API_KEY exists: {bool(os.environ.get('OPENAI_API_KEY'))}")
+    print(f"[INFO] Using model: gpt-4o-mini with 4s delay between requests")
     
     for root, dirs, files in os.walk(SOURCE_DIR):
         if ".git" in root or OUTPUT_DIR in root:
@@ -280,4 +282,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-##디버깅
