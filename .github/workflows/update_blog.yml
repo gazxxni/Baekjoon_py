@@ -1,34 +1,32 @@
 name: Update Blog Post to Another Repo
-
 on:
   push:
     branches:
       - main
     paths:
       - '**.py'
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
-
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-
+      
       - name: Install Dependencies
         run: |
-          pip install requests beautifulsoup4 google-generativeai
-
+          pip install requests beautifulsoup4 openai
+      
       - name: Run Converter Script
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python convert.py
-
+      
       - name: Pushes to Blog Repository
         uses: cpina/github-action-push-to-another-repository@main
         env:
@@ -40,5 +38,3 @@ jobs:
           user-email: 'action@github.com'
           target-branch: 'main'
           target-directory: '_posts'
-
-## 디버깅
