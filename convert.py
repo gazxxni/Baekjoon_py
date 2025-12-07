@@ -5,11 +5,17 @@ import requests
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 
-SOURCE_DIR = "."
+SOURCE_DIR = "auto_upload"  # 변경: 백준허브 폴더 지정
 OUTPUT_DIR = "blog_posts"
 
-def get_problem_info(filename):
-    match = re.search(r'(\d+)', filename)
+def get_problem_info(file_path):
+    """파일 경로(폴더명)에서 문제 번호 추출"""
+    # 폴더 경로에서 문제번호 찾기 (예: "10101. 삼각형 외우기")
+    match = re.search(r'/(\d+)\.', file_path)
+    if match:
+        return match.group(1)
+    # 윈도우 경로 대응
+    match = re.search(r'\\(\d+)\.', file_path)
     if match:
         return match.group(1)
     return None
@@ -178,15 +184,21 @@ def create_markdown(file_path, problem_id):
     print(f"Created post: {filename}")
 
 def main():
+    processed = set()  # 중복 방지
+    
     for root, dirs, files in os.walk(SOURCE_DIR):
         if ".git" in root or OUTPUT_DIR in root:
             continue
             
         for file in files:
             if file.endswith(".py"):
-                problem_id = get_problem_info(file)
-                if problem_id:
-                    create_markdown(os.path.join(root, file), problem_id)
+                file_path = os.path.join(root, file)
+                problem_id = get_problem_info(file_path)  # 경로 전체 전달
+                
+                if problem_id and problem_id not in processed:
+                    print(f"Processing: {file_path} -> Problem {problem_id}")
+                    create_markdown(file_path, problem_id)
+                    processed.add(problem_id)
 
 if __name__ == "__main__":
     main()
