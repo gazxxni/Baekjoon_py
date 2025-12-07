@@ -84,7 +84,7 @@ def generate_solution_with_ai(problem_data, code_content):
         
         # 모델 변경: gemini-1.5-flash-8b-latest (더 가볍고 빠름)
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash-8b-latest',
+            model_name='gemini-2.0-flash',
             generation_config={
                 "temperature": 0.7,
                 "max_output_tokens": 1024,
@@ -280,3 +280,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+##디버깅
