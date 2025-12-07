@@ -192,7 +192,7 @@ def create_markdown(py_path, readme_path, problem_id):
         f'title: "{post_title}"',
         f"date: {today}",
         "categories: [Algorithm, Baekjoon]",
-        f"tags: [python, algorithm, baekjoon, {problem_id}, {problem_data.get('category', '')}]",
+        f'tags: [python, algorithm, baekjoon, "{problem_id}", {problem_data.get("category", "")}]',
         "---",
         "",
         "## 문제 링크",
@@ -282,4 +282,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-#####
