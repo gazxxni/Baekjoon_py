@@ -1,5 +1,3 @@
-## 디버깅 ##
-
 name: Update Blog Post to Another Repo
 
 on:
@@ -42,3 +40,5 @@ jobs:
           user-email: 'action@github.com'
           target-branch: 'main'
           target-directory: '_posts'
+
+## 디버깅
