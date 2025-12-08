@@ -4,13 +4,16 @@ on:
     branches:
       - main
     paths:
-      - '**.py'
+      - 'auto_upload/**'  # auto_upload 폴더 변경 시에만 실행
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Git 히스토리 전체 가져오기 (커밋 날짜 확인용)
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,5 +41,3 @@ jobs:
           user-email: 'action@github.com'
           target-branch: 'main'
           target-directory: '_posts'
-
-#####
