@@ -2,10 +2,46 @@ import os
 import datetime
 import re
 import time
+import subprocess
 from openai import OpenAI
 
 SOURCE_DIR = "auto_upload"
 OUTPUT_DIR = "blog_posts"
+PROCESSED_FILE = ".processed_files.txt"
+
+def get_git_commit_date(file_path):
+    """Git에서 파일의 최초 커밋 날짜 가져오기"""
+    try:
+        # 파일의 첫 커밋 날짜 가져오기
+        result = subprocess.run(
+            ['git', 'log', '--diff-filter=A', '--follow', '--format=%aI', '--', file_path],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(file_path)) or '.'
+        )
+        
+        if result.stdout.strip():
+            # ISO 8601 형식을 YYYY-MM-DD로 변환
+            date_str = result.stdout.strip().split('\n')[-1]  # 가장 오래된 커밋
+            date_obj = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return date_obj.strftime("%Y-%m-%d")
+    except Exception as e:
+        print(f"[WARN] Could not get git date for {file_path}: {e}")
+    
+    # Git 정보를 가져올 수 없으면 오늘 날짜 반환
+    return datetime.datetime.now().strftime("%Y-%m-%d")
+
+def load_processed_files():
+    """이미 처리된 파일 목록 로드"""
+    if os.path.exists(PROCESSED_FILE):
+        with open(PROCESSED_FILE, 'r', encoding='utf-8') as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def save_processed_file(file_path):
+    """처리된 파일 기록"""
+    with open(PROCESSED_FILE, 'a', encoding='utf-8') as f:
+        f.write(f"{file_path}\n")
 
 def get_problem_info_from_path(file_path):
     """폴더명에서 문제 번호 추출"""
@@ -109,7 +145,6 @@ def generate_solution_with_ai(problem_data, code_content):
 
         print("[DEBUG] Sending request to OpenAI API...")
         
-        # GPT-4o-mini 사용 (저렴하고 빠름)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -120,21 +155,16 @@ def generate_solution_with_ai(problem_data, code_content):
             max_tokens=1024
         )
         
-        # 응답 확인
         if response and response.choices:
             solution = response.choices[0].message.content.strip()
             print("[OK] AI solution generated successfully")
             
-            # RPM 제한 회피: 4초 대기
             print("[INFO] Waiting 4 seconds to avoid rate limit...")
             time.sleep(4)
             
             return solution
         else:
             print(f"[ERROR] Empty response from OpenAI")
-            print(f"[DEBUG] Response object: {response}")
-            
-            # 실패해도 대기 (다음 요청을 위해)
             time.sleep(4)
             return None
         
@@ -143,14 +173,12 @@ def generate_solution_with_ai(problem_data, code_content):
         import traceback
         traceback.print_exc()
         
-        # 에러 발생해도 대기 (다음 요청을 위해)
         print("[INFO] Waiting 4 seconds before retry...")
         time.sleep(4)
         return None
 
-def create_markdown(py_path, readme_path, problem_id):
-    """마크다운 파일 생성"""
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
+def create_markdown(py_path, readme_path, problem_id, commit_date):
+    """마크다운 파일 생성 (커밋 날짜 사용)"""
     
     with open(py_path, 'r', encoding='utf-8') as f:
         code_content = f.read()
@@ -184,13 +212,13 @@ def create_markdown(py_path, readme_path, problem_id):
 
     title = problem_data.get('title', problem_id)
     post_title = f"[백준] {problem_id}번 {title} (Python)"
-    filename = f"{today}-baekjoon-{problem_id}.md"
+    filename = f"{commit_date}-baekjoon-{problem_id}.md"
 
     lines = [
         "---",
         "layout: post",
         f'title: "{post_title}"',
-        f"date: {today}",
+        f"date: {commit_date}",
         "categories: [Algorithm, Baekjoon]",
         f'tags: [python, algorithm, baekjoon, "{problem_id}", {problem_data.get("category", "")}]',
         "---",
@@ -245,14 +273,22 @@ def create_markdown(py_path, readme_path, problem_id):
     print(f"[OK] Created: {filename}")
 
 def main():
-    processed = set()
-    found_any = False
+    processed_files = load_processed_files()
+    new_files = []
     
     print(f"[INFO] Scanning {SOURCE_DIR}...")
     print(f"[DEBUG] OPENAI_API_KEY exists: {bool(os.environ.get('OPENAI_API_KEY'))}")
     print(f"[INFO] Using model: gpt-4o-mini with 4s delay between requests")
+    print(f"[INFO] Already processed: {len(processed_files)} files")
     
-    for root, dirs, files in os.walk(SOURCE_DIR):
+    # auto_upload 폴더 내의 백준 폴더만 스캔
+    baekjoon_dir = os.path.join(SOURCE_DIR, "백준")
+    
+    if not os.path.exists(baekjoon_dir):
+        print(f"[ERROR] {baekjoon_dir} not found!")
+        return
+    
+    for root, dirs, files in os.walk(baekjoon_dir):
         if ".git" in root or OUTPUT_DIR in root:
             continue
         
@@ -264,21 +300,36 @@ def main():
             
             for py_file in py_files:
                 py_path = os.path.join(root, py_file)
+                
+                # 이미 처리한 파일인지 확인
+                if py_path in processed_files:
+                    continue
+                
                 problem_id = get_problem_info_from_path(py_path)
                 
-                if problem_id and problem_id not in processed:
-                    found_any = True
-                    print(f"\n[INFO] Processing problem {problem_id}...")
-                    print(f"[INFO] Found: {py_path}")
-                    create_markdown(py_path, readme_path, problem_id)
-                    processed.add(problem_id)
+                if problem_id:
+                    new_files.append((py_path, readme_path, problem_id))
     
-    if not found_any:
-        print("[WARN] No valid problem folders found")
-    else:
-        print(f"\n{'='*50}")
-        print(f"[DONE] Successfully processed {len(processed)} problems")
-        print(f"{'='*50}")
+    if not new_files:
+        print("[INFO] No new files to process")
+        return
+    
+    print(f"[INFO] Found {len(new_files)} new problem(s) to process")
+    
+    for py_path, readme_path, problem_id in new_files:
+        print(f"\n[INFO] Processing problem {problem_id}...")
+        print(f"[INFO] File: {py_path}")
+        
+        # Git 커밋 날짜 가져오기
+        commit_date = get_git_commit_date(py_path)
+        print(f"[INFO] Commit date: {commit_date}")
+        
+        create_markdown(py_path, readme_path, problem_id, commit_date)
+        save_processed_file(py_path)
+    
+    print(f"\n{'='*50}")
+    print(f"[DONE] Successfully processed {len(new_files)} new problems")
+    print(f"{'='*50}")
 
 if __name__ == "__main__":
     main()
