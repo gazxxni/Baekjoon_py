@@ -4,7 +4,8 @@ on:
     branches:
       - main
     paths:
-      - 'auto_upload/**'  # auto_upload 폴더 변경 시에만 실행
+      - 'auto_upload/**'  # auto_upload 폴더 변경 시
+      - 'blog_posts/**'   # blog_posts 폴더 변경 시 (my_local 처리용)
 
 jobs:
   build:
@@ -30,7 +31,17 @@ jobs:
         run: |
           python convert.py
       
+      - name: Check if blog_posts exists
+        id: check_folder
+        run: |
+          if [ -d "blog_posts" ] && [ "$(ls -A blog_posts)" ]; then
+            echo "has_posts=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_posts=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Pushes to Blog Repository
+        if: steps.check_folder.outputs.has_posts == 'true'
         uses: cpina/github-action-push-to-another-repository@main
         env:
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
