@@ -8,7 +8,7 @@ from openai import OpenAI
 SOURCE_DIR = "auto_upload"
 OUTPUT_DIR = "blog_posts"
 PROCESSED_FILE = ".processed_files.txt"
-
+##수정
 def get_git_commit_date(file_path):
     """Git에서 파일의 최초 커밋 날짜 가져오기"""
     try:
