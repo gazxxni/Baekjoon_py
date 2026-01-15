@@ -1,18 +1,14 @@
 name: Update Blog Post to Another Repo
 
 on:
-  # 1. 수동 실행 가능 (테스트용)
   workflow_dispatch:
-  
-  # 2. 'Move files...' 액션이 끝나면 자동으로 이어서 실행 (핵심!)
   workflow_run:
-    workflows: ["Move files under auto_upload"]  # 앞선 워크플로우의 정확한 이름
+    workflows: ["Move files under auto_upload"]
     types:
       - completed
 
 jobs:
   build:
-    # 앞선 액션이 '성공'했을 때만 실행
     if: ${{ github.event.workflow_run.conclusion == 'success' }} 
     runs-on: ubuntu-latest
     steps:
@@ -21,7 +17,6 @@ jobs:
         with:
           fetch-depth: 0
       
-      # ... (이하 steps 내용은 기존과 동일하게 유지) ...
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -46,15 +41,29 @@ jobs:
             echo "has_posts=false" >> $GITHUB_OUTPUT
           fi
       
+      # [핵심 변경] 기존 액션을 지우고, 안전하게 'Clone -> Copy -> Push' 하는 스크립트로 변경
       - name: Pushes to Blog Repository
         if: steps.check_folder.outputs.has_posts == 'true'
-        uses: cpina/github-action-push-to-another-repository@main
         env:
+          # 블로그 리포지토리 주소 (본인 아이디/리포지토리명 확인 필수)
+          DEST_REPO: 'gazxxni/gazxxni.github.io' 
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
-        with:
-          source-directory: 'blog_posts'
-          destination-github-username: 'gazxxni'
-          destination-repository-name: 'gazxxni.github.io'
-          user-email: 'action@github.com'
-          target-branch: 'main'
-          target-directory: '_posts'
+        run: |
+          # 1. 블로그 리포지토리를 임시 폴더(destination_repo)에 다운로드(Clone)
+          git clone https://x-access-token:$API_TOKEN_GITHUB@github.com/$DEST_REPO.git destination_repo
+          
+          # 2. 새로 생성된 파일들을 블로그 폴더(_posts)로 복사
+          # -r: 폴더 내부까지, -u: 없거나 더 최신 파일일 때만 복사 (기존 파일 삭제 안 함!)
+          mkdir -p destination_repo/_posts
+          cp -r -u blog_posts/* destination_repo/_posts/
+          
+          # 3. 변경 사항을 블로그 리포지토리에 반영
+          cd destination_repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add _posts/
+          
+          # 변경 사항이 있을 때만 커밋하고 푸시 (에러 방지)
+          git diff --staged --quiet || git commit -m "🧩 Update algorithm solution post"
+          git push origin main
