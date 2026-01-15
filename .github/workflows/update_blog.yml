@@ -4,7 +4,7 @@ on:
     branches:
       - main
     paths:
-      - 'auto_upload/**'  # auto_upload 폴더 변경 시
+      - 'auto_upload/**'  # auto_upload 폴더 변경 시 1111
       - 'blog_posts/**'   # blog_posts 폴더 변경 시 (my_local 처리용)
 
 jobs:
@@ -52,5 +52,3 @@ jobs:
           user-email: 'action@github.com'
           target-branch: 'main'
           target-directory: '_posts'
-
-          # 수정continue-on-error: 
