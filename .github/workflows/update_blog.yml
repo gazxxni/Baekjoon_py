@@ -1,21 +1,27 @@
 name: Update Blog Post to Another Repo
+
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'auto_upload/**'  # auto_upload 폴더 변경 시 1111
-      - 'blog_posts/**'   # blog_posts 폴더 변경 시 (my_local 처리용)
+  # 1. 수동 실행 가능 (테스트용)
+  workflow_dispatch:
+  
+  # 2. 'Move files...' 액션이 끝나면 자동으로 이어서 실행 (핵심!)
+  workflow_run:
+    workflows: ["Move files under auto_upload"]  # 앞선 워크플로우의 정확한 이름
+    types:
+      - completed
 
 jobs:
   build:
+    # 앞선 액션이 '성공'했을 때만 실행
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} 
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Git 히스토리 전체 가져오기 (커밋 날짜 확인용)
+          fetch-depth: 0
       
+      # ... (이하 steps 내용은 기존과 동일하게 유지) ...
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
