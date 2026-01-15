@@ -2,7 +2,7 @@ name: Move files under auto_upload
 on:
   push:
     branches: [ "main" ]
-  # 필요하면 수동 실행도 허용
+  # 필요하면 수동 실행도 허용 1111
   # workflow_dispatch:
 
 jobs:
