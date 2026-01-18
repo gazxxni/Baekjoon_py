@@ -41,29 +41,42 @@ jobs:
             echo "has_posts=false" >> $GITHUB_OUTPUT
           fi
       
-      # [핵심 변경] 기존 액션을 지우고, 안전하게 'Clone -> Copy -> Push' 하는 스크립트로 변경
       - name: Pushes to Blog Repository
         if: steps.check_folder.outputs.has_posts == 'true'
         env:
-          # 블로그 리포지토리 주소 (본인 아이디/리포지토리명 확인 필수)
           DEST_REPO: 'gazxxni/gazxxni.github.io' 
           API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
         run: |
-          # 1. 블로그 리포지토리를 임시 폴더(destination_repo)에 다운로드(Clone)
+          # 1. 블로그 리포지토리 다운로드 (기존 파일 확인용)
           git clone https://x-access-token:$API_TOKEN_GITHUB@github.com/$DEST_REPO.git destination_repo
-          
-          # 2. 새로 생성된 파일들을 블로그 폴더(_posts)로 복사
-          # -r: 폴더 내부까지, -u: 없거나 더 최신 파일일 때만 복사 (기존 파일 삭제 안 함!)
           mkdir -p destination_repo/_posts
-          cp -r -u blog_posts/* destination_repo/_posts/
           
-          # 3. 변경 사항을 블로그 리포지토리에 반영
+          # 2. [핵심 로직] 중복 검사 후 복사
+          # blog_posts 폴더의 파일들을 하나씩 검사합니다.
+          cd blog_posts
+          for file in *.md; do
+            # 파일이 실제로 존재할 때만 실행
+            [ -e "$file" ] || continue
+            
+            # 파일명에서 날짜를 제외한 뒷부분(baekjoon-번호.md)을 추출
+            # 예: 2026-01-15-baekjoon-2887.md -> baekjoon-2887.md
+            identifier=$(echo "$file" | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}-//')
+            
+            # 블로그 폴더(_posts)에 같은 번호의 문제가 이미 있는지 검사
+            if ls ../destination_repo/_posts/*$identifier 1> /dev/null 2>&1; then
+              echo "⚠️ 중복 건너뜀 (이미 존재함): $file"
+            else
+              echo "✅ 새 글 업로드: $file"
+              cp "$file" ../destination_repo/_posts/
+            fi
+          done
+          cd ..
+          
+          # 3. 변경 사항 반영
           cd destination_repo
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
           git add _posts/
-          
-          # 변경 사항이 있을 때만 커밋하고 푸시 (에러 방지)
-          git diff --staged --quiet || git commit -m "🧩 Update algorithm solution post"
+          git diff --staged --quiet || git commit -m "🧩 Update new algorithm solution only"
           git push origin main
