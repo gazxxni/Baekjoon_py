@@ -1,34 +1,24 @@
 import sys
-from collections import deque
 
 s = sys.stdin.readline().rstrip()
-q = deque()
-ans = []
-flag = False
+ans = ""
+i = 0
 
-for word in s:
-    if word == '<':
-        flag = True
-        while q:
-            ans.append(q.popleft())
-        ans.append(word)
+while i < len(s):
+    if s[i] == '<':
+        j = s.find('>', i)
+        ans += s[i : j + 1]
+        i = j + 1
     
-    elif word == '>':
-        flag = False
-        ans.append(word)
+    elif s[i].isalnum():
+        start = i
+        while i < len(s) and s[i].isalnum():
+            i += 1
+        tmp = s[start:i]
+        ans += tmp[::-1]
     
-    elif flag:
-        ans.append(word)
-        
-    elif word == ' ':
-        while q:
-            ans.append(q.popleft())
-        ans.append(word)
-        
     else:
-        q.appendleft(word)
+        ans += s[i]
+        i += 1
 
-while q:
-    ans.append(q.popleft())
-
-print(''.join(ans))
+print(ans)
