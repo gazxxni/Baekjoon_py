@@ -1,0 +1,5 @@
+select a.ID, a.GENOTYPE, b.GENOTYPE as PARENT_GENOTYPE
+from ECOLI_DATA as a, ECOLI_DATA as b
+where a.PARENT_ID = b.ID
+and a.GENOTYPE & b.GENOTYPE = b.GENOTYPE
+order by ID
