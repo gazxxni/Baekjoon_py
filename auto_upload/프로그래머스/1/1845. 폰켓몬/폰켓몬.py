@@ -1,7 +1,8 @@
 from collections import Counter
 
 def solution(nums):
-    answer = len(nums) // 2
-    cnt = Counter(nums)
-    answer = min(answer, len(cnt))
-    return answer
+    answer = 0
+    new_num = Counter(nums)
+    
+    
+    return min(len(new_num), len(nums) // 2)
