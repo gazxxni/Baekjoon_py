@@ -9,18 +9,15 @@ def solution(new_id):
     while '..' in answer:
         answer = answer.replace('..', '.')
         
-    answer = answer[1:] if answer[0] == '.' and len(answer) > 1 else answer
-    answer = answer[:-1] if answer[-1] == '.' else answer
+    answer = answer.strip('.')
     
-    answer = 'a' if answer == '' else answer
+    if not answer:
+        answer = 'a'
     
     if len(answer) >= 16:
-        answer = answer[:15]
-        answer = answer[:-1] if answer[-1] == '.' else answer
+        answer = answer[:15].rstrip('.')
         
-    if len(answer) <= 2:
-        answer = answer + answer[-1] * (3 - len(answer))
-        
-        
-        
+    while len(answer) < 3:
+        answer += answer[-1]
+    
     return answer
