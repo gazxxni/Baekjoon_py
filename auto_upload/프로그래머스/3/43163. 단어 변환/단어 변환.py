@@ -1,24 +1,24 @@
 from collections import deque
 
 def solution(begin, target, words):
-
-    def bfs(x, time):
-        q = deque()
-        q.append((x, time))
+    def bfs(t, start):
+        q = deque([(t, start)])
         visited = set()
-        visited.add(x)
+        visited.add(start)
         
         while q:
-            cur, t = q.popleft()
-            if cur == target:
-                return t
+            cur_t, cur_word = q.popleft()
             
-            for next in words:
-                diff = [a for a, b in zip(cur, next) if a != b]
-                if len(diff) == 1 and next not in visited:
-                    q.append((next, t+1))
-                    visited.add(next)
-                    
+            if cur_word == target:
+                return cur_t
+            
+            for word in words:
+                diff = [a for a, b in zip(cur_word, word) if a != b]
+                if len(diff) == 1 and word not in visited:
+                    visited.add(word)
+                    q.append((cur_t+1, word))
+        
         return 0
-            
-    return bfs(begin, 0)
+    
+    return bfs(0, begin) 
+
