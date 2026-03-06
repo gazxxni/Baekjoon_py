@@ -1,17 +1,13 @@
 from collections import deque
 
 def solution(n, edge):
-    graph = {i : [] for i in range(1, n+1)}
-    for u, v in edge:
-        graph[u].append(v)
-        graph[v].append(u)
-        
+    answer = 0
+    
     def bfs(graph, start):
         distance = [-1] * (n+1)
-        q = deque()
-        q.append(start)
-        distance[1] = 0
-
+        q = deque([start])
+        distance[start] = 0
+        
         while q:
             cur = q.popleft()
             
@@ -21,12 +17,11 @@ def solution(n, edge):
                     q.append(next)
         
         return distance
+        
+    graph = {i:[] for i in range(1, n+1)}
+    for u, v in edge:
+        graph[u].append(v)
+        graph[v].append(u)
     
-    distance = bfs(graph, 1)
-    num = max(distance)
-    cnt = 0
-    for i in distance:
-        if i == num:
-            cnt += 1
-    
-    return cnt
+    distances = bfs(graph, 1)
+    return distances.count(max(distances))
