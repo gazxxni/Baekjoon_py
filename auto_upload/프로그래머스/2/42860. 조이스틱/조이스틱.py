@@ -1,8 +1,7 @@
 def solution(name):
     up_down = 0
-    for char in name:
-        up_down += min(ord(char) - ord('A'), ord('Z') - ord(char) + 1)
-        
+    for c in name:
+        up_down += min(ord(c) - ord('A'), ord('Z') - ord(c) + 1)
         
     n = len(name)
     move = n - 1
@@ -14,5 +13,5 @@ def solution(name):
             next_i += 1
             
         move = min(move, i * 2 + n - next_i, i + 2 * (n - next_i))
-        
+    
     return up_down + move
