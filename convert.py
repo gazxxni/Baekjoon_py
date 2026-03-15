@@ -425,10 +425,15 @@ def parse_readme(readme_path):
             ("category", r'### 분류\s*\n(.+?)(?=\n###|\n#|\Z)'),
             ("description", r'### 문제 설명\s*\n(.+?)(?=\n###|\n#|\Z)'),
             ("input", r'### 입력\s*\n(.+?)(?=\n###|\n#|\Z)'),
-            ("output", r'### 출력\s*\n(.+?)(?=\n###|\n#|\Z)')
+            ("output", r'### 출력\s*\n(.+?)(?=\n###|\n#|\Z)'),
         ]
         
-        for key, pattern in patterns:
+        # 카테고리는 백준(분류) / 프로그래머스(구분) 둘 다 지원
+        cat_match = re.search(r'### (?:분류|구분)\s*\n(.+?)(?=\n###|\n#|\Z)', content, re.DOTALL)
+        if cat_match:
+            data["category"] = re.sub(r'<[^>]+>', '', cat_match.group(1).strip()).strip()
+
+        for key, pattern in patterns[1:]:  # category는 위에서 처리했으므로 스킵
             match = re.search(pattern, content, re.DOTALL)
             if match:
                 clean_text = re.sub(r'<[^>]+>', '', match.group(1).strip())
@@ -492,19 +497,19 @@ def extract_fallback_content(code_content):
 ### 시간 복잡도
 -"""
 
-def generate_solution_with_ai(problem_data, code_content):
+def generate_solution_with_ai(problem_data, code_content, source="백준"):
     """OpenAI GPT로 풀이 생성 (Retry 로직 포함)"""
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         print("[ERROR] OPENAI_API_KEY is empty")
         return None
-    
+
     client = OpenAI(api_key=api_key)
-    
+
     # [중요] 포맷팅 깨짐 방지를 위해 백틱을 변수로 사용합니다.
-    bt3 = "`" * 3  
-    
-    prompt = f"""백준 문제 풀이를 작성해주세요.
+    bt3 = "`" * 3
+
+    prompt = f"""{source} 문제 풀이를 작성해주세요.
 문제: {problem_data.get('title', '')} ({problem_data.get('problem_id', '')})
 분류: {problem_data.get('category', '')}
 설명: {problem_data.get('description', '')}
@@ -557,7 +562,7 @@ def generate_solution_with_ai(problem_data, code_content):
 # ==========================================
 # 파일 생성 및 실행 (Main Execution)
 # ==========================================
-def create_markdown(py_path, readme_path, problem_id, commit_date):
+def create_markdown(py_path, readme_path, problem_id, commit_date, source="백준", level=None):
     """마크다운 파일 생성"""
     with open(py_path, 'r', encoding='utf-8') as f:
         code_content = f.read()
@@ -567,19 +572,67 @@ def create_markdown(py_path, readme_path, problem_id, commit_date):
         problem_data = {"title": f"{problem_id}번", "problem_id": problem_id}
 
     # 1. AI 풀이 생성 시도
-    ai_solution = generate_solution_with_ai(problem_data, code_content)
-    
+    ai_solution = generate_solution_with_ai(problem_data, code_content, source)
+
     # 2. AI 실패 시 Fallback 로직 실행 (주석 가져오기)
     if not ai_solution:
         print(f"[INFO] Using Fallback logic for {problem_id}...")
         ai_solution = extract_fallback_content(code_content)
 
-    title = problem_data.get('title', problem_id)
-    post_title = f"[백준] {problem_id}번 {title} (Python)"
-    filename = f"{commit_date}-baekjoon-{problem_id}.md"
-
     # [중요] 포맷팅 깨짐 방지를 위해 백틱을 변수로 사용합니다.
     bt3 = "`" * 3
+    title = problem_data.get('title', problem_id)
+
+    if source == "프로그래머스":
+        level_str = f"Level {level} " if level else ""
+        post_title = f"[프로그래머스] {level_str}{title} (Python)"
+        filename = f"{commit_date}-programmers-{problem_id}.md"
+        problem_url = f"https://school.programmers.co.kr/learn/courses/30/lessons/{problem_id}"
+        categories = "categories: [Algorithm, Programmers]"
+        tags = f'tags: [python, algorithm, programmers, "{problem_id}", {problem_data.get("category", "")}]'
+        # 프로그래머스는 입/출력 섹션 없음
+        body_lines = [
+            "## 문제 링크",
+            f"[{problem_url}]({problem_url})",
+            "",
+            "## 문제",
+            problem_data.get("description", "-") or "-",
+            "",
+            "## 풀이",
+            ai_solution,
+            "",
+            "## 코드",
+            f"{bt3}python",
+            code_content,
+            bt3,
+        ]
+    else:
+        post_title = f"[백준] {problem_id}번 {title} (Python)"
+        filename = f"{commit_date}-baekjoon-{problem_id}.md"
+        problem_url = f"https://www.acmicpc.net/problem/{problem_id}"
+        categories = "categories: [Algorithm, Baekjoon]"
+        tags = f'tags: [python, algorithm, baekjoon, "{problem_id}", {problem_data.get("category", "")}]'
+        body_lines = [
+            "## 문제 링크",
+            f"[{problem_url}]({problem_url})",
+            "",
+            "## 문제",
+            problem_data.get("description", "-") or "-",
+            "",
+            "## 입력",
+            problem_data.get("input", "-") or "-",
+            "",
+            "## 출력",
+            problem_data.get("output", "-") or "-",
+            "",
+            "## 풀이",
+            ai_solution,
+            "",
+            "## 코드",
+            f"{bt3}python",
+            code_content,
+            bt3,
+        ]
 
     # Front Matter 및 전체 내용 조립
     lines = [
@@ -587,29 +640,11 @@ def create_markdown(py_path, readme_path, problem_id, commit_date):
         "layout: post",
         f'title: "{post_title}"',
         f"date: {commit_date}",
-        "categories: [Algorithm, Baekjoon]",
-        f'tags: [python, algorithm, baekjoon, "{problem_id}", {problem_data.get("category", "")}]',
+        categories,
+        tags,
         "---",
         "",
-        "## 문제 링크",
-        f"[https://www.acmicpc.net/problem/{problem_id}](https://www.acmicpc.net/problem/{problem_id})",
-        "",
-        "## 문제",
-        problem_data.get("description", "-") or "-",
-        "",
-        "## 입력",
-        problem_data.get("input", "-") or "-",
-        "",
-        "## 출력",
-        problem_data.get("output", "-") or "-",
-        "",
-        "## 풀이",
-        ai_solution,
-        "",
-        "## 코드",
-        f"{bt3}python",
-        code_content,
-        bt3,
+        *body_lines,
     ]
     
     if not os.path.exists(OUTPUT_DIR):
@@ -621,41 +656,51 @@ def create_markdown(py_path, readme_path, problem_id, commit_date):
     
     print(f"[OK] Created: {filename}")
 
-def main():
-    print(f"[INFO] Starting converter...")
-    processed_files = load_processed_files()
-    
-    baekjoon_dir = os.path.join(SOURCE_DIR, "백준")
-    if not os.path.exists(baekjoon_dir):
-        print(f"[ERROR] Directory not found: {baekjoon_dir}")
+def process_directory(source_dir, source, processed_files):
+    """지정된 디렉토리의 파일들을 처리"""
+    if not os.path.exists(source_dir):
+        print(f"[WARN] Directory not found: {source_dir}")
         return
 
-    # 폴더 순회
-    for root, dirs, files in os.walk(baekjoon_dir):
-        # .git 폴더나 결과 폴더는 제외
+    for root, dirs, files in os.walk(source_dir):
         if ".git" in root or OUTPUT_DIR in root:
             continue
-            
+
         py_files = [f for f in files if f.endswith(".py")]
-        
+
         for py_file in py_files:
             py_path = os.path.join(root, py_file)
             readme_path = os.path.join(root, "README.md")
-            
-            # README가 없으면 건너뜀 (선택 사항)
+
             if not os.path.exists(readme_path):
                 continue
-                
-            # 이미 처리된 파일이면 건너뜀
+
             if py_path in processed_files:
                 continue
-                
+
             problem_id = get_problem_info_from_path(py_path)
-            if problem_id:
-                print(f"\n[INFO] Processing: {problem_id}")
-                commit_date = get_git_commit_date(py_path)
-                create_markdown(py_path, readme_path, problem_id, commit_date)
-                save_processed_file(py_path)
+            if not problem_id:
+                continue
+
+            # 프로그래머스는 경로에서 레벨 추출 (예: 프로그래머스/2/...)
+            level = None
+            if source == "프로그래머스":
+                level_match = re.search(r'프로그래머스[/\\](\d+)[/\\]', py_path)
+                if level_match:
+                    level = level_match.group(1)
+
+            print(f"\n[INFO] [{source}] Processing: {problem_id}")
+            commit_date = get_git_commit_date(py_path)
+            create_markdown(py_path, readme_path, problem_id, commit_date, source=source, level=level)
+            save_processed_file(py_path)
+
+
+def main():
+    print(f"[INFO] Starting converter...")
+    processed_files = load_processed_files()
+
+    process_directory(os.path.join(SOURCE_DIR, "백준"), "백준", processed_files)
+    process_directory(os.path.join(SOURCE_DIR, "프로그래머스"), "프로그래머스", processed_files)
 
     print(f"\n[DONE] Processing complete.")
 

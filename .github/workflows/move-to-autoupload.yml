@@ -69,3 +69,96 @@ jobs:
           else
             echo "Nothing moved."
           fi
+
+      - name: Update README stats
+        shell: bash
+        run: |
+          git config core.quotepath false
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 티어별 문제 수 계산
+          BRONZE=$(find auto_upload/백준/Bronze  -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
+          SILVER=$(find auto_upload/백준/Silver  -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
+          GOLD=$(find auto_upload/백준/Gold      -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
+          PLAT=$(find auto_upload/백준/Platinum  -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
+          PROG=$(find auto_upload/프로그래머스   -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
+          BAEKJOON=$((BRONZE + SILVER + GOLD + PLAT))
+          TOTAL=$((BAEKJOON + PROG))
+          TODAY=$(date +'%Y-%m-%d')
+
+          # 프로그레스바 생성 함수 (최대 10칸, 기준: Silver 72개 = 만땅)
+          make_bar() {
+            local count=$1
+            local max=72
+            local filled=$(( count * 10 / max ))
+            [ $filled -gt 10 ] && filled=10
+            local empty=$((10 - filled))
+            printf '%0.s█' $(seq 1 $filled 2>/dev/null) 2>/dev/null || true
+            printf '%0.s░' $(seq 1 $empty 2>/dev/null) 2>/dev/null || true
+          }
+          BAR_PLAT=$(make_bar $PLAT)
+          BAR_GOLD=$(make_bar $GOLD)
+          BAR_SILV=$(make_bar $SILVER)
+          BAR_BRON=$(make_bar $BRONZE)
+          BAR_PROG=$(make_bar $PROG)
+
+          # README의 STATS 섹션 및 배지/날짜 업데이트
+          python3 - <<PYEOF
+          import re
+
+          with open('README.md', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          # 배지 업데이트
+          content = re.sub(
+              r'!\[Baekjoon\]\(https://img\.shields\.io/badge/백준-\d+문제',
+              f'![Baekjoon](https://img.shields.io/badge/백준-${BAEKJOON}문제',
+              content
+          )
+          content = re.sub(
+              r'!\[Programmers\]\(https://img\.shields\.io/badge/프로그래머스-\d+문제',
+              f'![Programmers](https://img.shields.io/badge/프로그래머스-${PROG}문제',
+              content
+          )
+          content = re.sub(
+              r'!\[Total\]\(https://img\.shields\.io/badge/Total-\d+문제',
+              f'![Total](https://img.shields.io/badge/Total-${TOTAL}문제',
+              content
+          )
+
+          # STATS 테이블 업데이트
+          new_stats = """<!-- STATS_START -->
+          | 플랫폼 | 티어 | 문제 수 | 진행 |
+          |--------|------|:-------:|------|
+          | 백준 | 🔵 Platinum | ${PLAT} | \`${BAR_PLAT}\` |
+          | 백준 | 🟡 Gold | ${GOLD} | \`${BAR_GOLD}\` |
+          | 백준 | ⚪ Silver | ${SILVER} | \`${BAR_SILV}\` |
+          | 백준 | 🟤 Bronze | ${BRONZE} | \`${BAR_BRON}\` |
+          | 프로그래머스 | 🟢 Level 2 | ${PROG} | \`${BAR_PROG}\` |
+          <!-- STATS_END -->"""
+          content = re.sub(
+              r'<!-- STATS_START -->.*?<!-- STATS_END -->',
+              new_stats,
+              content,
+              flags=re.DOTALL
+          )
+
+          # 폴더 구조 문제 수 업데이트
+          content = re.sub(r'(Bronze/).*?문제', f'Bronze/   # ${BRONZE}문제', content)
+          content = re.sub(r'(Silver/).*?문제', f'Silver/   # ${SILVER}문제', content)
+          content = re.sub(r'(Gold/).*?문제',   f'Gold/     # ${GOLD}문제', content)
+          content = re.sub(r'(Platinum/).*?문제',f'Platinum/ #  ${PLAT}문제', content)
+          content = re.sub(r'(└── 2/).*?문제',  f'└── 2/        #  ${PROG}문제', content)
+
+          # 날짜 업데이트
+          content = re.sub(r'Last updated: \d{4}-\d{2}-\d{2}', 'Last updated: ${TODAY}', content)
+
+          with open('README.md', 'w', encoding='utf-8') as f:
+              f.write(content)
+
+          print(f"README updated: 백준={${BAEKJOON}}, 프로그래머스={${PROG}}, Total={${TOTAL}}")
+          PYEOF
+
+          # 변경사항 있으면 커밋
+          git diff --quiet README.md || (git add README.md && git commit -m "docs: README 통계 자동 업데이트 (Total: ${TOTAL}문제)" && git push)
