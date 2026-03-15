@@ -45,18 +45,6 @@ auto_upload/
 
 ---
 
-## 🤖 자동화 파이프라인
-
-```
-로컬에서 push
-  └─▶ [1단계] 백준/프로그래머스 파일 → auto_upload/ 이동
-        └─▶ [2단계] OpenAI로 풀이 생성 → 블로그(gazxxni.github.io) 자동 업로드
-```
-
-풀이 블로그: [gazxxni.github.io](https://gazxxni.github.io)
-
----
-
 <div align="center">
   <sub>Last updated: 2026-03-15</sub>
 </div>
