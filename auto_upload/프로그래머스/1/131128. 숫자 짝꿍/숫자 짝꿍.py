@@ -1,6 +1,5 @@
 from collections import defaultdict
 def solution(X, Y):
-    answer = ''
     x = [int(i) for i in X]
     y = [int(i) for i in Y]
     dic_x = defaultdict(int)
@@ -34,6 +33,3 @@ def solution(X, Y):
 
     else:
         return '-1'
-    
-    
-    return answer
