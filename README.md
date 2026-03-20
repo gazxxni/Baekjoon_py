@@ -3,8 +3,8 @@
 > 백준 + 프로그래머스 풀이 기록 | Since 2024.06
 
 [![Baekjoon](https://img.shields.io/badge/백준-141문제-E8820B?style=for-the-badge&logo=data:image/png;base64,)](https://www.acmicpc.net/)
-[![Programmers](https://img.shields.io/badge/프로그래머스-69문제-1EC500?style=for-the-badge)](https://programmers.co.kr/)
-[![Total](https://img.shields.io/badge/Total-210문제-4A90D9?style=for-the-badge)](https://github.com/gazxxni/Baekjoon_py)
+[![Programmers](https://img.shields.io/badge/프로그래머스-70문제-1EC500?style=for-the-badge)](https://programmers.co.kr/)
+[![Total](https://img.shields.io/badge/Total-211문제-4A90D9?style=for-the-badge)](https://github.com/gazxxni/Baekjoon_py)
 
 ---
 
@@ -17,7 +17,7 @@
 | 백준 | 🟡 Gold | 12 | `█░░░░░░░░░` |
 | 백준 | ⚪ Silver | 72 | `██████████░` |
 | 백준 | 🟤 Bronze | 51 | `███████░░░` |
-| 프로그래머스 | 🟢 Level 2 | 69 | `█████████░` |
+| 프로그래머스 | 🟢 Level 2 | 70 | `█████████░` |
 <!-- STATS_END -->
 
 ---
@@ -40,7 +40,7 @@ auto_upload/
 │   ├── Gold/     # 12문제
 │   └── Platinum/ #  6문제
 └── 프로그래머스/
-    └── 2/        #  69문제
+    └── 2/        #  70문제
 ```
 
 ---
