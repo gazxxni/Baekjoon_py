@@ -6,29 +6,25 @@ def is_prime(x):
     
     for i in range(2, int(x ** 0.5) + 1):
         if prime[i]:
-            for j in range(i * i, x + 1, i):
+            for j in range(i*i, x+1, i):
                 prime[j] = False
                 
     return prime
-    
+
 def solution(numbers):
-    numbers = list(map(str, numbers))
+    numbers = [int(i) for i in numbers]
     numbers.sort(reverse=True)
-    m = ''.join(numbers)
+    m = ''.join(map(str, numbers))
     prime = is_prime(int(m))
     
-    per = []
+    num = set()
     for i in range(1, len(numbers) + 1):
         for p in permutations(numbers, i):
-            per.append(p)
-    
-    new = set()
-    for p in per:
-        new.add(int(''.join(p)))
-        
+            num.add(int(''.join(map(str, p))))
+            
     cnt = 0
-    for i in list(new):
+    for i in list(num):
         if prime[i]:
             cnt += 1
-    
+            
     return cnt
