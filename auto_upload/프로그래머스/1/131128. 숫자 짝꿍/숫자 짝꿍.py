@@ -1,35 +1,26 @@
-from collections import defaultdict
 def solution(X, Y):
-    x = [int(i) for i in X]
-    y = [int(i) for i in Y]
-    dic_x = defaultdict(int)
-    dic_y = defaultdict(int)
-    for i in range(10):
-        if i in x:
-            dic_x[i] += x.count(i)
-        else:
-            dic_x[i] = 0
-            
-        if i in y:
-            dic_y[i] += y.count(i)
-        else:
-            dic_y[i] = 0
-            
-    arr = []
-    for x_i, x_v in dic_x.items():
-        for y_i, y_v in dic_y.items():
-            if x_i == y_i:
-                cnt = max(x_v, y_v) - abs(x_v - y_v)
-                for _ in range(cnt):
-                    arr.append(x_i)
-                break
+    dic_x = {i:0 for i in range(10)}
+    dic_y = {i:0 for i in range(10)}
+    answer = []
+    
+    for i in map(int, X):
+        dic_x[i] += 1
+    for i in map(int, Y):
+        dic_y[i] += 1
+    
+    idx = 0
+    for x, y in zip(dic_x.values(), dic_y.values()):
+        if min(x, y) > 0:
+            for _ in range(min(x, y)):
+                answer.append(idx)
                 
-    arr.sort(reverse=True)
-    if arr:
-        if sum(arr) == 0:
+        idx += 1
+        
+    answer.sort(reverse=True)
+    if answer:
+        if sum(answer) == 0:
             return '0'
         else:
-            return ''.join(map(str, arr))
-
+            return ''.join(map(str, answer))
     else:
         return '-1'
