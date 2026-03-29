@@ -1,20 +1,15 @@
-import math
 def solution(n, words):
-    answer = []
-    prev = words[0]
-    p_words = [prev]
-    num = 2
-    for word in words[1:]:
-        number = num % n if num % n != 0 else n
-        if prev[-1] == word[0]:
-            if word in p_words:
-                return [number, math.ceil(num / n)]
+    answer = [words[0]]
+    le = len(words)
+    prev = answer[0][-1]
+    num, turn = 0, 0
+    for i in range(1, le):
+        if words[i] in answer or prev != words[i][0]:
+            num = i % n + 1
+            turn = i // n + 1
+            break
             
-            else:
-                num += 1
-                prev = word
-                p_words.append(word)
-        else:      
-            return [number, math.ceil(num / n)]
+        answer.append(words[i])
+        prev = words[i][-1]
         
-    return [0, 0]
+    return [num, turn]
